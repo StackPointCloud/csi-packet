@@ -57,7 +57,7 @@ spec:
               mountPath: /csi
         - name: packet-driver
           imagePullPolicy: Always
-          image: gcr.io/stackpoint-public/csi-packet-driver:38079d7-dirty
+          image: gcr.io/stackpoint-public/csi-packet-driver:732d2f3
           args:
             - "--v=5"
             - "--endpoint=$(CSI_ENDPOINT)"

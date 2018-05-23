@@ -28,7 +28,7 @@ func NewPacketDriver(endpoint, nodeID, configurationPath string) (*PacketDriver,
 		}
 	}
 	return &PacketDriver{
-		name:     "csi-packet",
+		name:     "csi-packet", // this could be configurable, and must match a plugin directory name for kubelet to use
 		nodeID:   nodeID,
 		endpoint: endpoint,
 		config:   config,

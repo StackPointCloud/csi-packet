@@ -1,98 +1,113 @@
 ## Container Storage Interface (CSI) plugin for Packet
 
+### System configuration
+
+Since we control the initial setup of the hosts, we can make sure they are configured
+correctly with isciadm and multipath.  Packet is currently relying on the attach and detach
+scripts to rewrite system configuration and restart services, notably iscsiadm and multipath
+  * multipath configuration must use-friendly-names
+  * iscsiadm initiator name
+```
+    INAME=$(curl -sSL https://metadata.packet.net/metadata | jq -r .iqn)
+    perl -pi -e "s/InitiatorName=.*/InitiatorName=$INAME/" /etc/iscsi/initiatorname.iscsi
+    systemctl restart iscsid
+```
+
 ### References
 
 Packet API:
-    https://www.packet.net/developers/api/volumes/
-    https://github.com/packethost/packngo
-    https://github.com/ebsarr/packet
-    
-*  https://github.com/packethost/packet-block-storage/
+  *  https://www.packet.net/developers/api/volumes/
+  *  https://github.com/packethost/packngo
+  *  https://github.com/ebsarr/packet
+  *  https://github.com/packethost/packet-block-storage/
 
 
-packet-flex-volume: 
-    https://github.com/karlbunch/packet-k8s-flexvolume/blob/master/flexvolume/packet/plugin.py#L463
+packet-flex-volume:
+  *  https://github.com/karlbunch/packet-k8s-flexvolume/blob/master/flexvolume/packet/plugin.py#L463
 
-    create: https://github.com/karlbunch/packet-k8s-flexvolume/blob/master/flexvolume/packet/plugin.py#L350
-    attach: https://github.com/karlbunch/packet-k8s-flexvolume/blob/master/flexvolume/packet/plugin.py#L497
-            https://github.com/packethost/packet-python/blob/master/packet/Volume.py#L38
-    iscsi, multipath: https://github.com/karlbunch/packet-k8s-flexvolume/blob/master/flexvolume/packet/plugin.py#L515
-    mount: https://github.com/karlbunch/packet-k8s-flexvolume/blob/master/flexvolume/packet/plugin.py#L544
+  *  create: https://github.com/karlbunch/packet-k8s-flexvolume/blob/master/flexvolume/packet/plugin.py#L350
+  *  attach:
+    *  https://github.com/karlbunch/packet-k8s-flexvolume/blob/master/flexvolume/packet/plugin.py#L497
+    *  https://github.com/packethost/packet-python/blob/master/packet/Volume.py#L38
+  *  iscsi, multipath: https://github.com/karlbunch/packet-k8s-flexvolume/blob/master/flexvolume/packet/plugin.py#L515
+  *  mount: https://github.com/karlbunch/packet-k8s-flexvolume/blob/master/flexvolume/packet/plugin.py#L544
 
 iscsi:
-    https://coreos.com/os/docs/latest/iscsi.html
-    https://eucalyptus.atlassian.net/wiki/spaces/STOR/pages/84312154/iscsiadm+basics
-    https://linux.die.net/man/8/multipath
-    https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/6/html/dm_multipath/
+ *   https://coreos.com/os/docs/latest/iscsi.html
+ *   https://eucalyptus.atlassian.net/wiki/spaces/STOR/pages/84312154/iscsiadm+basics
+ *   https://linux.die.net/man/8/multipath
+ *   https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/6/html/dm_multipath/
 
 mount:
-    https://coreos.com/os/docs/latest/mounting-storage.html
-    https://oguya.ch/posts/2015-09-01-systemd-mount-partition/
-    
-    ? https://github.com/coreos/bugs/issues/2254
-    ? https://github.com/kubernetes/kubernetes/issues/59946#issuecomment-380401916
-    ? https://github.com/kubernetes/kubernetes/pull/63176
+  *   https://coreos.com/os/docs/latest/mounting-storage.html
+  *   https://oguya.ch/posts/2015-09-01-systemd-mount-partition/
+  *  ? https://github.com/coreos/bugs/issues/2254
+  *  ? https://github.com/kubernetes/kubernetes/issues/59946#issuecomment-380401916
+  *  ? https://github.com/kubernetes/kubernetes/pull/63176
 
-CSI design   
-    https://github.com/container-storage-interface/spec/blob/master/spec.md#rpc-interface
+CSI design
+  *  https://github.com/container-storage-interface/spec/blob/master/spec.md#rpc-interface
 
 CSI examples
-    https://github.com/kubernetes-csi/drivers
-    https://github.com/libopenstorage/openstorage/tree/master/csi
-    https://github.com/thecodeteam/csi-vsphere
+  *  https://github.com/kubernetes-csi/drivers
+  *  https://github.com/libopenstorage/openstorage/tree/master/csi
+  *  https://github.com/thecodeteam/csi-vsphere
 
-    https://github.com/openebs/csi-openebs/
-    https://github.com/digitalocean/csi-digitalocean 
+  *  https://github.com/openebs/csi-openebs/
+  *  https://github.com/digitalocean/csi-digitalocean
 
-    https://github.com/GoogleCloudPlatform/compute-persistent-disk-csi-driver/ https://github.com/GoogleCloudPlatform/compute-persistent-disk-csi-driver/blob/master/deploy/kubernetes/README.md
+  *  https://github.com/GoogleCloudPlatform/compute-persistent-disk-csi-driver/
+  *  https://github.com/GoogleCloudPlatform/compute-persistent-disk-csi-driver/blob/master/deploy/kubernetes/README.md
 
 
-    grpc server: https://github.com/GoogleCloudPlatform/compute-persistent-disk-csi-driver/blob/6702720a9de93b57d73fa8912ef04ce6327a00e3/pkg/gce-csi-driver/server.go
-    https://github.com/digitalocean/csi-digitalocean/blob/783dcec9b26da4ee9c36b6472e180ebb904c465d/driver/driver.go
-    https://dev.to/chilladx/how-we-use-grpc-to-build-a-clientserver-system-in-go-1mi    
+grpc server
+
+  *    https://github.com/GoogleCloudPlatform/compute-persistent-disk-csi-driver/blob/6702720a9de93b57d73fa8912ef04ce6327a00e3/pkg/gce-csi-driver/server.go
+  *  https://github.com/digitalocean/csi-digitalocean/blob/783dcec9b26da4ee9c36b6472e180ebb904c465d/driver/driver.go
+  *  https://dev.to/chilladx/how-we-use-grpc-to-build-a-clientserver-system-in-go-1mi
 
 
 Documentation
-    https://kubernetes.io/blog/2018/04/10/container-storage-interface-beta/
-    https://github.com/kubernetes/community/blob/master/contributors/design-proposals/resource-management/device-plugin.md#unix-socket
-    https://github.com/kubernetes/community/blob/master/contributors/design-proposals/storage/container-storage-interface.md
-    https://github.com/kubernetes/community/blob/master/sig-storage/volume-plugin-faq.md
-    https://github.com/kubernetes/community/blob/master/sig-storage/volume-plugin-faq.md#working-with-out-of-tree-volume-plugin-options
-    https://kubernetes-csi.github.io/docs/Drivers.html
-    https://kubernetes.io/blog/2018/01/introducing-container-storage-interface/
-    https://kubernetes.io/docs/concepts/storage/volumes/
-    https://github.com/container-storage-interface/spec/blob/master/spec.md#rpc-interface
+  *  https://kubernetes.io/blog/2018/04/10/container-storage-interface-beta/
+  *  https://github.com/kubernetes/community/blob/master/contributors/design-proposals/resource-management/device-plugin.md#unix-socket
+  *  https://github.com/kubernetes/community/blob/master/contributors/design-proposals/storage/container-storage-interface.md
+  *  https://github.com/kubernetes/community/blob/master/sig-storage/volume-plugin-faq.md
+  *  https://github.com/kubernetes/community/blob/master/sig-storage/volume-plugin-faq.md#working-with-out-of-tree-volume-plugin-options
+  *  https://kubernetes-csi.github.io/docs/Drivers.html
+  *  https://kubernetes.io/blog/2018/01/introducing-container-storage-interface/
+  *  https://kubernetes.io/docs/concepts/storage/volumes/
+  *  https://github.com/container-storage-interface/spec/blob/master/spec.md#rpc-interface
 
 grpc
-    https://grpc.io/docs/quickstart/go.html
-    https://github.com/golang/protobuf
-    https://grpc.io/docs/tutorials/basic/go.html 
-    https://developers.google.com/protocol-buffers/docs/proto3
+   * https://grpc.io/docs/quickstart/go.html
+   * https://github.com/golang/protobuf
+   * https://grpc.io/docs/tutorials/basic/go.html
+   * https://developers.google.com/protocol-buffers/docs/proto3
 
 
 protobuf spec
-    https://github.com/container-storage-interface/spec
+  *  https://github.com/container-storage-interface/spec
 
 
 seems interesting ...
-    https://github.com/kubernetes/kubernetes/issues/59946
-    https://github.com/kubernetes/kubernetes/issues?utf8=%E2%9C%93&q=is%3Aissue+is%3Aopen+iSCSI    
+  *  https://github.com/kubernetes/kubernetes/issues/59946
+  *  https://github.com/kubernetes/kubernetes/issues?utf8=%E2%9C%93&q=is%3Aissue+is%3Aopen+iSCSI
 
 ### CSI vs FlexVolumes
 
-FlexVolumes are an older spec, since k8s 1.2, and will be supported in the future.  Requires root access to install on each node and assumes OS-based tools are installed. "The Storage SIG suggests implementing a CSI driver if possible" 
+FlexVolumes are an older spec, since k8s 1.2, and will be supported in the future.  Requires root access to install on each node and assumes OS-based tools are installed. "The Storage SIG suggests implementing a CSI driver if possible"
 
 ### CSI design summary
 
-Kubernetes will introduce a new in-tree volume plugin called CSI. 
+Kubernetes will introduce a new in-tree volume plugin called CSI.
 
 This plugin, in kubelet, will make volume mount and unmount rpcs to a unix domain socket on the host machine. The driver component responds to these requests in a specialized way. (https://github.com/kubernetes/community/blob/master/contributors/design-proposals/storage/container-storage-interface.md#kubelet-to-csi-driver-communication)
 
 
 Lifecycle management of volume is done by the controller-manager (https://github.com/kubernetes/community/blob/master/contributors/design-proposals/storage/container-storage-interface.md#master-to-csi-driver-communication) and communication is mediated through the api-server, which requires that the external component watch the k8s api for changes. The design document suggests a sidecar “Kubernetes to CSI” proxy.
 
-The concern here is that 
-  - communication to the diver is done through a local unix domain socket 
+The concern here is that
+  - communication to the diver is done through a local unix domain socket
   - the driver is untrusted and cannot be allowed to run on the master node
   - the controller manager runs on the master node
   - the driver doesn't have any kubernetes-awareness, doesn't have k8s client code or how to watch the api serer
@@ -109,7 +124,7 @@ Sequence:
         - Mount, Format    NodeStageVolume (called once only per volume)
             - Bind Mount NodePublishVolume
             - Bind Unmount NodeUnpublishVolume
-        - Unmount  NodeUnstageVolume 
+        - Unmount  NodeUnstageVolume
     - Detach       ControllerUnpublish
  - Destroy         DeleteVolume
 
@@ -131,22 +146,22 @@ https://github.com/kubernetes/community/blob/master/contributors/design-proposal
 Mounting a filesystem is an os task, not cloud provider.
 
 DO, GCE create a mounter type
-    https://github.com/digitalocean/csi-digitalocean/blob/master/driver/mounter.go
-    https://github.com/GoogleCloudPlatform/compute-persistent-disk-csi-driver/blob/master/pkg/mount-manager/mounter.go
+ *   https://github.com/digitalocean/csi-digitalocean/blob/master/driver/mounter.go
+ *   https://github.com/GoogleCloudPlatform/compute-persistent-disk-csi-driver/blob/master/pkg/mount-manager/mounter.go
 VSphere calls out to a separate library
-    https://github.com/akutz/gofsutil
+ *   https://github.com/akutz/gofsutil
 why not use [sys](https://godoc.org/golang.org/x/sys/unix#Mount)? Well, it seems we need to exec out in order to call mkfs anyway
 
-https://github.com/thecodeteam/csi-vsphere/blob/master/service/node.go
+  * https://github.com/thecodeteam/csi-vsphere/blob/master/service/node.go
 
 
-on our coreos installs, 
-    iscsid
-    multipathd
+on our coreos installs,
+ *   iscsid
+ *   multipathd
 are present but not running
 
 
-### 
+###
 
 grpc server exposes the Identity, Controller and Node
 
@@ -160,27 +175,28 @@ mounter is embeded in Node, mounts and formats as necessary
 ### Deployment
 
 GCE for example, deploys the node server as a daemonset, running
-
+```
           image: gcr.io/dyzz-csi-staging/csi/gce-driver:latest
           args:
             - "--v=5"
             - "--endpoint=$(CSI_ENDPOINT)"
             - "--nodeid=$(KUBE_NODE_NAME)"
-
+```
 alongside
+```
     - csi-driver-registrar (https://github.com/kubernetes-csi/driver-registrar)
-
+```
 The controller server is deployed as a single-replica stateful set
-
+```
           image: gcr.io/dyzz-csi-staging/csi/gce-driver:latest
           args:
             - "--v=5"
             - "--endpoint=$(CSI_ENDPOINT)"
             - "--nodeid=$(KUBE_NODE_NAME)"
-
-alongside 
-    - csi-attacher (watches volumeAttach api events https://github.com/kubernetes-csi/external-attacher)
-    - csi-external-provisioner (watches PersistentVolumeClaim events, https://github.com/kubernetes-csi/external-provisioner) 
+```
+alongside
+  * csi-attacher (watches volumeAttach api events https://github.com/kubernetes-csi/external-attacher)
+  * csi-external-provisioner (watches PersistentVolumeClaim events, https://github.com/kubernetes-csi/external-provisioner)
 containers
 
 So the driver itself is exactly the same in the two configurations.  In the case of the node, it is communicating over grpc with kubelet. The controller is communicating over grpc with the sidecar containers.
@@ -194,7 +210,7 @@ where SanitizedCSIDriverName ... is the name or type specified in a particular P
 
 #### Weird node deployment
 
-So 
+So
 
 Right
 
@@ -206,7 +222,7 @@ Recall, though, how this is deployed.  It's a container in a pod in a daemonset 
 
 ##### iscisadmin in container
 
-There are images with iscsiadmin packaged.  Running them with 
+There are images with iscsiadmin packaged.  Running them with
 
 ```
 core@spck8q2o0h-worker-1 ~ $ ls
@@ -241,7 +257,7 @@ Login to [iface: default, target: iqn.2013-05.com.daterainc:tc:01:sn:25c3e33abe6
 ```
 
 ##### multipath in container
-
+```
 docker run --rm -ti \
   --net=host --privileged \
   -v /etc/multipath/:/etc/multipath/ \
@@ -249,9 +265,10 @@ docker run --rm -ti \
   -v /dev:/dev \
    tripleoupstream/centos-binary-multipathd bash
 
+```
 
-https://docs.racket-lang.org/multipath-daemon/index.html
-https://github.com/moby/moby/issues/14767#issuecomment-269481738
+* https://docs.racket-lang.org/multipath-daemon/index.html
+* https://github.com/moby/moby/issues/14767#issuecomment-269481738
 
 daemon and client are communicating over an abstract socket, @/org/kernel/linux/storage/multipathd
 this value is fixed, not configurable.
@@ -288,11 +305,13 @@ apt-get install -y strace
 #  -v /sys/devices:/sys/devices \
 
 strace -f -e trace=open /opt/host-bin/packet-block-storage-attach -v
+```
 
-so, sometimes multipath hangs, sometimes not.  It is _not_ waiting on a 
+so, sometimes multipath hangs, sometimes not.  It is _not_ waiting on a
 file.  It hangs when invoking -f on a volume to remove, and strace says:
-
+```
 strace multipath -f volume-f15126bc
+```
 
 ```
 semget(0xd4d8821, 1, IPC_CREAT|IPC_EXCL|0600) = 131076
@@ -308,7 +327,7 @@ semop(131076, [{0, -1, IPC_NOWAIT}], 1) = 0
 semop(131076, [{0, 0, 0}], 1
 ```
 
-on the host itself it just completes properly, 
+on the host itself it just completes properly,
 ```
 close(4)                                = 0
 semop(851969, [{0, 1, 0}], 1)           = 0
@@ -328,10 +347,12 @@ exit_group(0)                           = ?
 +++ exited with 0 +++
 ```
 #####
+```
 # FROM ubuntu:18.04
 # RUN apt-get update
-# RUN apt-get install -y wget multipath-tools open-iscsi curl jq -->
-
+# RUN apt-get install -y wget multipath-tools open-iscsi curl jq
+```
+```
 # /opt/host-bin/packet-block-storage-attach
 portal: 10.144.144.227 iqn: iqn.2013-05.com.daterainc:tc:01:sn:1e9c06a93aad6c8f
 Error: We couldn't log in iqn iqn.2013-05.com.daterainc:tc:01:sn:1e9c06a93aad6c8f
@@ -341,21 +362,22 @@ Error: Block device /dev/mapper/volume-f15126bc is NOT available for use
 
 # iscsiadm --mode discovery --type sendtargets --portal 10.144.144.226 --discover
 iscsiadm: No portals found
-
 ```
+
+
 :(
 
 
 
---- 
+---
 inside the container, running multipath -v 3:
-
+```
 May 17 17:24:53 | sda: blacklisted, udev property missing
 May 17 17:24:53 | sdb: blacklisted, udev property missing
 May 17 17:24:53 | sdc: blacklisted, udev property missing
 May 17 17:24:53 | sdd: blacklisted, udev property missing
 
-but outside on the host, 
+but outside on the host,
 May 17 17:19:26 | sda: udev property ID_WWN whitelisted
 May 17 17:19:26 | sda: not found in pathvec
 May 17 17:19:26 | sda: mask = 0x3f
@@ -375,8 +397,10 @@ May 17 17:19:26 | sdc: vendor = DATERA
 May 17 17:19:26 | sdc: product = IBLOCK
 
 
-You can see the difference with 
+You can see the difference with
+```
     udevadm info --query=all --name=/dev/sdc
+```
 where on the host we get all the properties (more than 40) including ID_WWN and SCSI_IDENT_* but in the containeronly 9 are shown.
 
 https://stackoverflow.com/questions/41753218/udevadm-does-not-show-all-attributes-inside-a-docker-container
@@ -394,21 +418,21 @@ https://stackoverflow.com/questions/41753218/udevadm-does-not-show-all-attribute
     * iscsiadmin discover + login creates the device locally /dev/sd[X] (block-device-name=sdc)
     * find the id with /lib/udev/scsi_id -g -u -d /dev/sd[X]
     * configure /etc/multipath/bindings with volumename and scsid id
-    * call multipath to create it. 
+    * call multipath to create it.
 
-problem: 
+problem:
    script expects to find "/dev/mapper/$volname" but  "/dev/mapper/$wwid" is present and links to /dev/dm-2, not /dev/
 
 script will remove the "mpatha SAMSUNG_MZ7KM240HMHQ-00005_S3F5NY0J401892" entry in /etc/multipath/bindings, is this necessary? idk, it gets recreated anyway
 Make sure "user_friendly_names     yes" in the config
 now it works ...
-
+```
 for p in $portals; do iscsiadm --mode discovery --type sendtargets --portal $p --discover; done
 for p in $portals; do iscsiadm --mode node --targetname $iqn --portal $p --login; done
 
 volname=$(curl -sSL https://metadata.packet.net/metadata | jq -r .volumes[0].name)
 
-for p in $portals; 
+for p in $portals;
 do
     bdname=`ls -l /dev/disk/by-path/ | grep "$iqn" | grep $p | awk {'print $11'} | sed 's/..\/..\///'`
     wwid=`/lib/udev/scsi_id -g -u -d /dev/$bdname`
@@ -417,9 +441,9 @@ do
 done
 
 sed -i "/^mpath.*/d" /etc/multipath/bindings
-multipath -v 2 $volname  # and Ctrl-c :( 
+multipath -v 2 $volname  # and Ctrl-c :(
 multipath -ll
-
+```
 
 ### format and mount
 
@@ -450,7 +474,7 @@ mount -t ext4 /dev/mapper/volume-4ea47168  /mnt/test-vol-4ea47168  # other optio
 ### Unmount
 
 ```
-umount  /mnt/test-vol-4ea47168 
+umount  /mnt/test-vol-4ea47168
 ```
 
 ### Unstage
@@ -463,8 +487,8 @@ egrep -v "^#" /etc/multipath/bindings | wc -l
 3
 ```
 
+cleanup mpath entries in bindings file
 ```
-# cleanup mpath entries in bindings file
 sed -i "/^mpath.*/d" /etc/multipath/bindings
 if [ `ls /dev/mapper/mpath* >/dev/null 2>/dev/null` ]; then
   [ $_V -eq 1 ] && echo "mpath volume entries found, cleaning up"
@@ -492,7 +516,7 @@ gives portal + iqn.  If the iqn matches, then
 1. log out of it
 ```
 
-for p in $portals; 
+for p in $portals;
 do
  iscsiadm --mode node --targetname $iqn --portal $p --logout
 done
@@ -520,7 +544,7 @@ should no longer have the iqn in this list
 
 ### ControllerDetach
 
-remotely, 
+remotely,
 
 ```
 $ curl -s -X DELETE -H "X-Auth-Token: $PACKET_TOKEN" https://api.packet.net/storage/attachments/$ATTACH_ID

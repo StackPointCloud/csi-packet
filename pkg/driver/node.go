@@ -114,11 +114,12 @@ func (nodeServer *PacketNodeServer) NodeStageVolume(ctx context.Context, in *csi
 
 	volumeMetaData, err := getPacketVolumeMetadata(volumeName)
 	if err != nil {
+		glog.V(5).Infof("NodeStageVolume: %v", err)
 		return nil, err
 	}
 
 	if len(volumeMetaData.Ips) == 0 {
-		return nil, fmt.Errorf("volume %s not has no portals", volumeName)
+		return nil, fmt.Errorf("volume %s has no portals", volumeName)
 	}
 
 	if in.GetVolumeCapability() == nil {
@@ -139,30 +140,36 @@ func (nodeServer *PacketNodeServer) NodeStageVolume(ctx context.Context, in *csi
 	for _, ip := range volumeMetaData.Ips {
 		err = iscsiadminDiscover(ip) // iscsiadm --mode discovery --type sendtargets --portal 10.144.144.226 --discover
 		if err != nil {
+			glog.V(5).Infof("NodeStageVolume: %v", err)
 			return nil, err
 		}
 		err = iscsiadminLogin(ip, volumeMetaData.Iqn)
 		if err != nil {
+			glog.V(5).Infof("NodeStageVolume: %v", err)
 			return nil, err
 		}
 	}
 
 	// configure multimap
-	deviceID, err := getDevice(volumeMetaData.Ips[0], volumeMetaData.Iqn)
+	devicePath, err := getDevice(volumeMetaData.Ips[0], volumeMetaData.Iqn)
 	if err != nil {
+		glog.V(5).Infof("NodeStageVolume: %v", err)
 		return nil, err
 	}
-	scsiID, err := getScsiID(deviceID)
+	scsiID, err := getScsiID(devicePath)
 	if err != nil {
+		glog.V(5).Infof("NodeStageVolume: %v", err)
 		return nil, err
 	}
 	bindings, discards, err := readBindings()
 	if err != nil {
+		glog.V(5).Infof("NodeStageVolume: %v", err)
 		return nil, err
 	}
 	bindings[volumeName] = scsiID
 	err = writeBindings(bindings)
 	if err != nil {
+		glog.V(5).Infof("NodeStageVolume: %v", err)
 		return nil, err
 	}
 	for mappingName, _ := range discards {
@@ -170,25 +177,28 @@ func (nodeServer *PacketNodeServer) NodeStageVolume(ctx context.Context, in *csi
 	}
 	multipath(volumeName)
 
-	check, err := multipath("-ll", fmt.Sprintf("/dev/%s", deviceID))
-	glog.V(5).Infof("multipath check for %s: %s", deviceID, check)
+	check, err := multipath("-ll", devicePath)
+	glog.V(5).Infof("multipath check for %s: %s", devicePath, check)
 	if check == "" {
-		// something's wrong
+		glog.V(5).Infof("NodeStageVolume: check is empty")
 	}
 
 	blockInfo, err := getMappedDevice(volumeName)
 	if err != nil {
+		glog.V(5).Infof("NodeStageVolume: %v", err)
 		return nil, err
 	}
 	if blockInfo.FsType == "" {
 		err = formatMappedDevice(volumeName)
 		if err != nil {
+			glog.V(5).Infof("NodeStageVolume: %v", err)
 			return nil, err
 		}
 	}
 
 	err = mountMappedDevice(volumeName, in.StagingTargetPath)
 	if err != nil {
+		glog.V(5).Infof("NodeStageVolume: %v", err)
 		return nil, err
 	}
 
@@ -246,7 +256,7 @@ func (nodeServer *PacketNodeServer) NodePublishVolume(ctx context.Context, in *c
 	// volumeID := in.VolumeId
 	// volumeName := in.PublishInfo["VolumeName"]
 
-	err := mountFs(in.GetStagingTargetPath(), in.GetTargetPath())
+	err := bindmountFs(in.GetStagingTargetPath(), in.GetTargetPath())
 	if err != nil {
 		return nil, err
 	}

@@ -1,2 +1,6 @@
-vendor
+vendor/
+bin/
+.go/
 scratch
+.container*
+.docker*

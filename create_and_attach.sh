@@ -75,3 +75,4 @@ curl -g -X POST -d @scratch.json \
   https://api.packet.net/storage/${VOLUME_ID}/attachments
 
 
+# POST https://api.packet.net/storage/102c28c7-47cf-4dfa-82e6-5eb5ae023514/attachments

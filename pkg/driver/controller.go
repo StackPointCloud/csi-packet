@@ -92,8 +92,8 @@ func (controller *PacketControllerServer) CreateVolume(ctx context.Context, in *
 	if err != nil {
 		return nil, err
 	}
-	if httpResponse.StatusCode != http.StatusOK {
-		return nil, errors.Errorf("bad status from list volumes, %s", httpResponse.Status)
+	if httpResponse.StatusCode != http.StatusOK && httpResponse.StatusCode != http.StatusCreated {
+		return nil, errors.Errorf("bad status from create volume, %s", httpResponse.Status)
 	}
 	description, err = cloud_provider.ReadDescription(volume.Description)
 	if err != nil {
@@ -116,8 +116,8 @@ func (controller *PacketControllerServer) DeleteVolume(ctx context.Context, in *
 	if err != nil {
 		return nil, err
 	}
-	if httpResponse.StatusCode != http.StatusOK && httpResponse.StatusCode != http.StatusNotFound {
-		return nil, errors.Errorf("bad status from list volumes, %s", httpResponse.Status)
+	if httpResponse.StatusCode != http.StatusOK && httpResponse.StatusCode != http.StatusNoContent && httpResponse.StatusCode != http.StatusNotFound {
+		return nil, errors.Errorf("bad status from delete volumes, %s", httpResponse.Status)
 	}
 	return &csi.DeleteVolumeResponse{}, nil
 }
@@ -184,6 +184,9 @@ func (controller *PacketControllerServer) ControllerUnpublishVolume(ctx context.
 
 	volume, httpResponse, err := controller.Provider.Get(volumeID)
 	if err != nil {
+		if httpResponse != nil && httpResponse.StatusCode == http.StatusNotFound {
+			return &csi.ControllerUnpublishVolumeResponse{}, nil
+		}
 		return nil, err
 	}
 	if httpResponse.StatusCode != http.StatusOK {
@@ -202,9 +205,12 @@ func (controller *PacketControllerServer) ControllerUnpublishVolume(ctx context.
 
 	httpResponse, err = controller.Provider.Detach(attachmentID)
 	if err != nil {
+		if httpResponse != nil && httpResponse.StatusCode == http.StatusNotFound {
+			return &csi.ControllerUnpublishVolumeResponse{}, nil
+		}
 		return nil, err
 	}
-	if httpResponse.StatusCode != http.StatusOK {
+	if httpResponse.StatusCode != http.StatusOK && httpResponse.StatusCode != http.StatusNotFound {
 		return nil, errors.Errorf("bad status from list volumes, %s", httpResponse.Status)
 	}
 

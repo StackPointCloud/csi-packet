@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -47,10 +48,14 @@ func multipath(args ...string) (string, error) {
 	return string(output), err
 }
 
-func getScsiID(device string) (string, error) {
-	devicePath := filepath.Join("/dev", device)
-	out, err := exec.Command("/lib/udev/scsi_id", "-g", "-u", "-d", devicePath).Output()
-	return string(out), err
+func getScsiID(devicePath string) (string, error) {
+	args := []string{"-g", "-u", "-d", devicePath}
+	out, err := exec.Command("/lib/udev/scsi_id", args...).Output()
+	if err != nil {
+		glog.V(5).Infof("/lib/udev/scsi_id %v : %s, %v", args, out, err)
+		return "", err
+	}
+	return string(out), nil
 }
 
 func getDevice(portal, iqn string) (string, error) {
@@ -73,67 +78,146 @@ func getDevice(portal, iqn string) (string, error) {
 	if finfo.Mode()&os.ModeSymlink == 0 {
 		return "", fmt.Errorf("file %s is not a link", file)
 	}
-	source, err := os.Readlink(file)
+	source, err := filepath.EvalSymlinks(file)
 	if err != nil {
+		glog.V(5).Infof("cannot get symlink for %s", file)
 		return "", err
 	}
-	linkedFile, err := os.Stat(source)
-	if err != nil {
-		return "", err
-	}
-	return linkedFile.Name(), nil
+	return source, nil
+	// linkedFile, err := os.Stat(source)
+	// if err != nil {
+	// 	return "", err
+	// }
+	// return linkedFile.Name(), nil
 
 }
 
 func iscsiadminDiscover(ip string) error {
-	args := fmt.Sprintf("--mode discovery --portal %s --type sendtargets --discover", ip)
-	_, err := exec.Command("iscsiadm", args).Output()
+	args := []string{"--mode", "discovery", "--portal", ip, "--type", "sendtargets", "--discover"}
+	output, err := exec.Command("iscsiadm", args...).CombinedOutput()
 	if err != nil {
+		glog.V(5).Infof("iscsiadm %v : %s, %v", args, output, err)
 		return err
 	}
 	return nil
 }
 
-func iscsiadminLogin(ip, iqn string) error {
-	args := fmt.Sprintf("--mode node --portal %s  --targetname %s --login", ip, iqn)
-	_, err := exec.Command("iscsiadm", args).Output()
+func iscsiadminHasSession(ip, iqn string) (bool, error) {
+	args := []string{"--mode", "session"}
+	out, err := exec.Command("iscsiadm", args...).CombinedOutput()
 	if err != nil {
+		glog.V(5).Infof("iscsiadm %v : %s, %v", args, out, err)
+		return false, nil // this is almost certainly "No active sessions"
+	}
+	pat, err := regexp.Compile(ip + ".*" + iqn)
+	if err != nil {
+		return false, err
+	}
+	// glog.V(5).Infof("iscsiadm sessions %s", string(out[:]))
+	lines := strings.Split(string(out[:]), "\n")
+	for _, line := range lines {
+		found := pat.FindString(line)
+
+		if found != "" {
+			return true, nil
+		}
+		// glog.V(5).Infof("iscsiadm session not found in line: %s", line)
+	}
+	return false, nil
+}
+
+func iscsiadminLogin(ip, iqn string) error {
+	hasSession, err := iscsiadminHasSession(ip, iqn)
+	if err != nil {
+		return err
+	}
+	if hasSession {
+		return nil
+	}
+	args := []string{"--mode", "node", "--portal", ip, "--targetname", iqn, "--login"}
+	output, err := exec.Command("iscsiadm", args...).CombinedOutput()
+	if err != nil {
+		glog.V(5).Infof("iscsiadm %v : %s, %v", args, output, err)
 		return err
 	}
 	return nil
 }
 
 func iscsiadminLogout(ip, iqn string) error {
-	args := fmt.Sprintf("--mode node --portal %s  --targetname %s --logout", ip, iqn)
-	_, err := exec.Command("iscsiadm", args).Output()
+	hasSession, err := iscsiadminHasSession(ip, iqn)
 	if err != nil {
+		return err
+	}
+	if !hasSession {
+		return nil
+	}
+	args := []string{"--mode", "node", "--portal", ip, "--targetname", iqn, "--logout"}
+	out, err := exec.Command("iscsiadm", args...).CombinedOutput()
+	if err != nil {
+		glog.V(5).Infof("iscsiadm %v : %s, %v", args, out, err)
 		return err
 	}
 	return nil
 }
 
-func mountFs(src, target string) error {
-	_, err := exec.Command("mount", "-t", "ext4", "--source", src, "--target", target).Output()
-	return err
+func bindmountFs(src, target string) error {
+
+	if _, err := os.Stat(target); err != nil {
+		if os.IsNotExist(err) {
+			os.MkdirAll(target, 0755)
+		} else {
+			glog.V(5).Infof("stat %s, %v", target, err)
+			return err
+		}
+	}
+	_, err := os.Stat(target)
+	if err != nil {
+		glog.V(5).Infof("stat %s, %v", target, err)
+		return err
+	}
+	args := []string{"--bind", src, target}
+	out, err := exec.Command("mount", args...).CombinedOutput()
+	if err != nil {
+		glog.V(5).Infof("mount %v : %s, %v", args, out, err)
+		return err
+	}
+	return nil
 }
 
 func unmountFs(path string) error {
-	_, err := exec.Command("umount", path).Output()
-	return err
+	args := []string{path}
+	out, err := exec.Command("umount", args...).CombinedOutput()
+	if err != nil {
+		glog.V(5).Infof("umount %v : %s, %v", args, out, err)
+		return err
+	}
+	return nil
 }
 
 func mountMappedDevice(device, target string) error {
 	devicePath := filepath.Join("/dev/mapper/", device)
-	return mountFs(devicePath, target)
+	args := []string{"-t", "ext4", "--source", devicePath, "--target", target}
+	out, err := exec.Command("mount", args...).CombinedOutput()
+	if err != nil {
+		glog.V(5).Infof("mount %v : %s, %v", args, out, err)
+		return err
+	}
+	return nil
 
 }
 
 // etx4 format
 func formatMappedDevice(device string) error {
 	devicePath := filepath.Join("/dev/mapper/", device)
-	fstype := "etx4"
-	_, err := exec.Command("mkfs."+fstype, "-F", devicePath).Output()
-	return err
+	args := []string{"-F", devicePath}
+	fstype := "ext4"
+	command := "mkfs." + fstype
+	out, err := exec.Command(command, args...).CombinedOutput()
+	if err != nil {
+		glog.V(5).Infof("%s %v : %s, %v", command, args, out, err)
+		return err
+	}
+	return nil
 }
 
 // represents the lsblk info
@@ -184,6 +268,16 @@ func readBindings() (map[string]string, map[string]string, error) {
 
 	var bindings = map[string]string{}
 	var discard = map[string]string{}
+
+	if _, err := os.Stat(multipathBindings); err != nil {
+		if os.IsNotExist(err) {
+			// file does not exist
+			return bindings, discard, nil
+		} else {
+			return nil, nil, err
+		}
+	}
+
 	f, err := os.Open(multipathBindings)
 	if err != nil {
 		return nil, nil, err
@@ -193,7 +287,7 @@ func readBindings() (map[string]string, map[string]string, error) {
 	scanner := bufio.NewScanner(f)
 	for scanner.Scan() {
 		line := scanner.Text()
-		if line[0] != '#' {
+		if len(line) > 0 && line[0] != '#' {
 			elements := strings.Fields(line)
 			if len(elements) == 2 {
 
