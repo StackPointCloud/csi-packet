@@ -64,7 +64,10 @@ spec:
             - mountPath: /run/udev
               name: run-udev
             - mountPath: /var/lib/iscsi
-              name: var-lib-iscsi              
+              name: var-lib-iscsi
+            - mountPath: /usr/share/ca-certificates/
+              name: ca-certs-alternative
+              readOnly: true
       volumes:
         # TODO(dependency): this will work when kublet registrar functionality exists
         #- name: registrar-socket-dir
@@ -98,3 +101,7 @@ spec:
           hostPath:
             path: /run/udev/
             type: Directory
+        - name: ca-certs-alternative
+          hostPath:
+            path: /usr/share/ca-certificates/
+            type: DirectoryOrCreate

@@ -4,3 +4,4 @@ bin/
 scratch
 .container*
 .docker*
+cloud-sa.json
