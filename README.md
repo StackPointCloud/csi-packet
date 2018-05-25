@@ -7,7 +7,7 @@ The basic refernce for Kubernetes CSI is found at https://kubernetes-csi.github.
 
 A typical sequence of the tasks performed by the Controller and Node components is
 
- - **Create**          *Controller.CreateVolume* 
+ - **Create**          *Controller.CreateVolume*
     - **Attach**       *Controller.ControllerPublish*
         - **Mount, Format**   *Node.NodeStageVolume* (called once only per volume)
             - **Bind Mount**   *Node.NodePublishVolume*
@@ -46,7 +46,7 @@ The controller is deployed as a StatefulSet to ensure that there is a single ins
 
 ### Helper sidecar containers
 
-The CSI plugin framework is designed to be agnostic with respect to the Container Orchestrator system, and so there is no direct communication between the CSI plugin and the kubernetes api.  Instead, the CSI project provides a number of sidecar containers which mediate beween the plugin and kubernetes. 
+The CSI plugin framework is designed to be agnostic with respect to the Container Orchestrator system, and so there is no direct communication between the CSI plugin and the kubernetes api.  Instead, the CSI project provides a number of sidecar containers which mediate beween the plugin and kubernetes.
 
 The controller deployment uses
 
@@ -86,3 +86,13 @@ See additional documents in the docs/ directory
 ## Caveat
 
 The plugin at present is far from production assurance, and requires testing and hardening. Even listing the known issues is premature.
+
+## Development
+
+The makefile uses an alpine-go image to build the driver, and packages it into an image, closely following https://github.com/thockin/go-build-template.  The version number defaults to the git hash but may be set explicitly.
+
+```
+dep ensure
+# export VERSION=5.4.3
+make container
+```
