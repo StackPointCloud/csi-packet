@@ -18,4 +18,4 @@ kubectl -n kube-system create -f node.yaml
 kubectl -n kube-system create -f controller.yaml
 
 ### Step 3 (Run demo [optional]):
-kubectl create -f demo-pod.yaml
+kubectl create -f demo-deployment.yaml
