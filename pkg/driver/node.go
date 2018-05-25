@@ -6,6 +6,8 @@ import (
 	"io/ioutil"
 	"net/http"
 
+	"github.com/StackPointCloud/csi-packet/pkg/packet"
+
 	"github.com/container-storage-interface/spec/lib/go/csi/v0"
 	"github.com/golang/glog"
 	"golang.org/x/net/context"
@@ -17,7 +19,6 @@ var _ csi.NodeServer = &PacketNodeServer{}
 
 type PacketNodeServer struct {
 	Driver *PacketDriver
-	// Mounter *Mounter
 }
 
 func NewPacketNodeServer(driver *PacketDriver) *PacketNodeServer {
@@ -208,7 +209,7 @@ func (nodeServer *PacketNodeServer) NodeStageVolume(ctx context.Context, in *csi
 // NodeUnstageVolume ~ iscisadmin, multipath
 func (nodeServer *PacketNodeServer) NodeUnstageVolume(ctx context.Context, in *csi.NodeUnstageVolumeRequest) (*csi.NodeUnstageVolumeResponse, error) {
 	volumeID := in.VolumeId
-	volumeName := packetVolumeIDToName(volumeID)
+	volumeName := packet.VolumeIDToName(volumeID)
 
 	err := unmountFs(in.StagingTargetPath)
 	if err != nil {

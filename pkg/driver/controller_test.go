@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/StackPointCloud/csi-packet/pkg/cloud_provider"
+	"github.com/StackPointCloud/csi-packet/pkg/packet"
 	"github.com/StackPointCloud/csi-packet/pkg/test"
 
 	"github.com/stretchr/testify/assert"
@@ -32,9 +32,9 @@ func TestCreateVolume(t *testing.T) {
 
 	provider := test.NewMockVolumeProvider(mockCtrl)
 	volume := packngo.Volume{
-		Size:        cloud_provider.DefaultVolumeSizeGb,
+		Size:        packet.DefaultVolumeSizeGb,
 		ID:          providerVolumeID,
-		Description: cloud_provider.NewVolumeDescription(csiVolumeName).String(),
+		Description: packet.NewVolumeDescription(csiVolumeName).String(),
 	}
 	resp := packngo.Response{
 		&http.Response{
@@ -56,8 +56,92 @@ func TestCreateVolume(t *testing.T) {
 	csiResp, err := controller.CreateVolume(context.TODO(), &volumeRequest)
 	assert.Nil(t, err)
 	assert.Equal(t, providerVolumeID, csiResp.GetVolume().Id)
-	assert.Equal(t, cloud_provider.DefaultVolumeSizeGb*cloud_provider.GB, csiResp.GetVolume().GetCapacityBytes())
+	assert.Equal(t, packet.DefaultVolumeSizeGb*packet.GB, csiResp.GetVolume().GetCapacityBytes())
 
+}
+
+func runTestCreateVolume(t *testing.T, volumeRequest csi.CreateVolumeRequest, providerRequest packngo.VolumeCreateRequest, providerVolume packngo.Volume, success bool) {
+
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+
+	provider := test.NewMockVolumeProvider(mockCtrl)
+
+	resp := packngo.Response{
+		&http.Response{
+			StatusCode: http.StatusOK,
+		},
+		packngo.Rate{},
+	}
+	provider.EXPECT().ListVolumes().Return([]packngo.Volume{}, &resp, nil)
+	provider.EXPECT().Create(gomock.Any()).Return(&providerVolume, &resp, nil)
+
+	controller := NewPacketControllerServer(provider)
+
+	csiResp, err := controller.CreateVolume(context.TODO(), &volumeRequest)
+	assert.Nil(t, err)
+	assert.Equal(t, providerVolume.ID, csiResp.GetVolume().Id)
+	assert.Equal(t, int64(providerVolume.Size)*packet.GB, csiResp.GetVolume().GetCapacityBytes())
+}
+
+type VolumeTestCase struct {
+	volumeRequest   csi.CreateVolumeRequest
+	providerRequest packngo.VolumeCreateRequest
+	providerVolume  packngo.Volume
+	success         bool
+}
+
+func TestCreateVolumes(t *testing.T) {
+	testCases := []VolumeTestCase{
+		VolumeTestCase{
+			volumeRequest: csi.CreateVolumeRequest{
+				Name: "pv-qT2QXcwbqPB3BAurt1ccs7g6SDVT0qLv",
+				CapacityRange: &csi.CapacityRange{
+					RequiredBytes: 10 * 1024 * 1024 * 1024,
+					LimitBytes:    100 * 1024 * 1024 * 1024,
+				},
+			},
+			providerRequest: packngo.VolumeCreateRequest{
+				BillingCycle: packet.BillingHourly,
+				Description:  packet.NewVolumeDescription("pv-qT2QXcwbqPB3BAurt1ccs7g6SDVT0qLv").String(),
+				Locked:       false,
+				Size:         10,
+				PlanID:       packet.VolumePlanStandard,
+			},
+			providerVolume: packngo.Volume{
+				Size:        packet.DefaultVolumeSizeGb,
+				ID:          "5a3c678a-64a4-41ba-a03c-e7d74a96f06a",
+				Description: packet.NewVolumeDescription("pv-qT2QXcwbqPB3BAurt1ccs7g6SDVT0qLv").String(),
+			},
+			success: true,
+		},
+		VolumeTestCase{
+			volumeRequest: csi.CreateVolumeRequest{
+				Name: "pv-61C4yMq09WV1ZpNIOBKHRQDKoZzyK7ZF",
+				CapacityRange: &csi.CapacityRange{
+					RequiredBytes: 1 * 1024 * 1024,
+					LimitBytes:    1000 * 1024 * 1024 * 1024,
+				},
+			},
+			providerRequest: packngo.VolumeCreateRequest{
+				BillingCycle: packet.BillingHourly,
+				Description:  packet.NewVolumeDescription("pv-61C4yMq09WV1ZpNIOBKHRQDKoZzyK7ZF").String(),
+				Locked:       false,
+				Size:         10,
+				PlanID:       packet.VolumePlanStandard,
+			},
+			providerVolume: packngo.Volume{
+				Size:        packet.DefaultVolumeSizeGb,
+				ID:          "06e45c5c-8bd9-44fd-a9e4-1518105de113",
+				Description: packet.NewVolumeDescription("pv-61C4yMq09WV1ZpNIOBKHRQDKoZzyK7ZF").String(),
+			},
+			success: true,
+		},
+	}
+
+	for _, testCase := range testCases {
+		runTestCreateVolume(t, testCase.volumeRequest, testCase.providerRequest, testCase.providerVolume, testCase.success)
+	}
 }
 
 func TestIdempotentCreateVolume(t *testing.T) {
@@ -69,9 +153,9 @@ func TestIdempotentCreateVolume(t *testing.T) {
 
 	provider := test.NewMockVolumeProvider(mockCtrl)
 	volume := packngo.Volume{
-		Size:        cloud_provider.DefaultVolumeSizeGb,
+		Size:        packet.DefaultVolumeSizeGb,
 		ID:          providerVolumeID,
-		Description: cloud_provider.NewVolumeDescription(csiVolumeName).String(),
+		Description: packet.NewVolumeDescription(csiVolumeName).String(),
 	}
 	resp := packngo.Response{
 		&http.Response{

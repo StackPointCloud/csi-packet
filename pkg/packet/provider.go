@@ -1,7 +1,9 @@
-package cloud_provider
+package packet
 
 import (
+	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/packethost/packngo"
@@ -9,10 +11,8 @@ import (
 )
 
 const (
-	ConsumerToken         = "csi-packet"
-	VolumePlanStandard    = "87728148-3155-4992-a730-8d1e6aca8a32"
-	VolumePlanPerformance = "d6570cfb-38fa-4467-92b3-e45d059bb249"
-	BillingHourly         = "hourly"
+	ConsumerToken = "csi-packet"
+	BillingHourly = "hourly"
 )
 
 type Config struct {
@@ -27,6 +27,12 @@ type PacketVolumeProvider struct {
 
 var _ VolumeProvider = &PacketVolumeProvider{}
 var _ NodeVolumeManager = &PacketVolumeProvider{}
+
+func VolumeIDToName(id string) string {
+	// "3ee59355-a51a-42a8-b848-86626cc532f0" -> "volume-3ee59355"
+	uuidElements := strings.Split(id, "-")
+	return fmt.Sprintf("volume-%s", uuidElements[0])
+}
 
 func NewPacketProvider(config Config) (*PacketVolumeProvider, error) {
 	return &PacketVolumeProvider{config}, nil

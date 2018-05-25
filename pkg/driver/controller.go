@@ -8,7 +8,7 @@ import (
 
 	"net/http"
 
-	"github.com/StackPointCloud/csi-packet/pkg/cloud_provider"
+	"github.com/StackPointCloud/csi-packet/pkg/packet"
 	csi "github.com/container-storage-interface/spec/lib/go/csi/v0"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc/codes"
@@ -18,10 +18,10 @@ import (
 var _ csi.ControllerServer = &PacketControllerServer{}
 
 type PacketControllerServer struct {
-	Provider cloud_provider.VolumeProvider
+	Provider packet.VolumeProvider
 }
 
-func NewPacketControllerServer(provider cloud_provider.VolumeProvider) *PacketControllerServer {
+func NewPacketControllerServer(provider packet.VolumeProvider) *PacketControllerServer {
 	return &PacketControllerServer{
 		Provider: provider,
 	}
@@ -39,11 +39,11 @@ func (controller *PacketControllerServer) CreateVolume(ctx context.Context, in *
 	}
 	for _, volume := range volumes {
 
-		description, err := cloud_provider.ReadDescription(volume.Description)
+		description, err := packet.ReadDescription(volume.Description)
 		if err == nil && description.Name == in.Name {
 			out := csi.CreateVolumeResponse{
 				Volume: &csi.Volume{
-					CapacityBytes: int64(volume.Size) * cloud_provider.GB,
+					CapacityBytes: int64(volume.Size) * packet.GB,
 					Id:            volume.ID,
 					Attributes:    nil,
 				},
@@ -58,33 +58,33 @@ func (controller *PacketControllerServer) CreateVolume(ctx context.Context, in *
 	//   required otherwise
 	//   within restrictions of max, min
 	//   default otherwise
-	sizeRequestGB := cloud_provider.DefaultVolumeSizeGb
+	sizeRequestGB := packet.DefaultVolumeSizeGb
 	capacityRange := in.CapacityRange
 	if capacityRange != nil {
 		maxBytes := capacityRange.GetLimitBytes()
 		if maxBytes != 0 {
-			sizeRequestGB = int(maxBytes / cloud_provider.GB)
-			if sizeRequestGB > cloud_provider.MaxVolumeSizeGb {
-				sizeRequestGB = cloud_provider.MaxVolumeSizeGb
+			sizeRequestGB = int(maxBytes / packet.GB)
+			if sizeRequestGB > packet.MaxVolumeSizeGb {
+				sizeRequestGB = packet.MaxVolumeSizeGb
 			}
 		} else {
 			minBytes := capacityRange.GetRequiredBytes()
 			if minBytes != 0 {
-				sizeRequestGB = int(minBytes / cloud_provider.GB)
-				if sizeRequestGB < cloud_provider.MinVolumeSizeGb {
-					sizeRequestGB = cloud_provider.MinVolumeSizeGb
+				sizeRequestGB = int(minBytes / packet.GB)
+				if sizeRequestGB < packet.MinVolumeSizeGb {
+					sizeRequestGB = packet.MinVolumeSizeGb
 				}
 			}
 		}
 	}
 
-	description := cloud_provider.NewVolumeDescription(in.Name)
+	description := packet.NewVolumeDescription(in.Name)
 
 	volumeCreateRequest := packngo.VolumeCreateRequest{
-		Size:         sizeRequestGB,                     // int               `json:"size"`
-		BillingCycle: cloud_provider.BillingHourly,      // string            `json:"billing_cycle"`
-		PlanID:       cloud_provider.VolumePlanStandard, // string            `json:"plan_id"`
-		Description:  description.String(),              // string            `json:"description,omitempty"`
+		Size:         sizeRequestGB,             // int               `json:"size"`
+		BillingCycle: packet.BillingHourly,      // string            `json:"billing_cycle"`
+		PlanID:       packet.VolumePlanStandard, // string            `json:"plan_id"`
+		Description:  description.String(),      // string            `json:"description,omitempty"`
 		// SnapshotPolicies // []*SnapshotPolicy `json:"snapshot_policies,omitempty"`
 	}
 	volume, httpResponse, err := controller.Provider.Create(&volumeCreateRequest)
@@ -95,13 +95,13 @@ func (controller *PacketControllerServer) CreateVolume(ctx context.Context, in *
 	if httpResponse.StatusCode != http.StatusOK && httpResponse.StatusCode != http.StatusCreated {
 		return nil, errors.Errorf("bad status from create volume, %s", httpResponse.Status)
 	}
-	description, err = cloud_provider.ReadDescription(volume.Description)
+	description, err = packet.ReadDescription(volume.Description)
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to read csi description from provider volume")
 	}
 	out := csi.CreateVolumeResponse{
 		Volume: &csi.Volume{
-			CapacityBytes: int64(volume.Size) * cloud_provider.GB,
+			CapacityBytes: int64(volume.Size) * packet.GB,
 			Id:            volume.ID,
 			Attributes:    nil,
 		},

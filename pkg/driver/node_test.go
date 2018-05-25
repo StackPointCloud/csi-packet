@@ -1,16 +1,5 @@
 package driver
 
-import (
-	"testing"
-
-	"github.com/stretchr/testify/assert"
-)
-
-func TestPacketVolumeIDToName(t *testing.T) {
-	name := packetVolumeIDToName("3ee59355-a51a-42a8-b848-86626cc532f0")
-	assert.Equal(t, name, "volume-3ee59355")
-}
-
 //
 //  three steps to mocking a single os/exec.Command call
 

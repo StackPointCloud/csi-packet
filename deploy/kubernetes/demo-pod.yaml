@@ -8,7 +8,7 @@ spec:
   storageClassName: csi-packet-pd
   resources:
     requests:
-      storage: 10Gi
+      storage: 50Gi
 
 ---
 

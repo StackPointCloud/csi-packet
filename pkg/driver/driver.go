@@ -4,19 +4,19 @@ import (
 	"encoding/json"
 	"io/ioutil"
 
-	"github.com/StackPointCloud/csi-packet/pkg/cloud_provider"
+	"github.com/StackPointCloud/csi-packet/pkg/packet"
 )
 
 type PacketDriver struct {
 	name     string
 	nodeID   string
 	endpoint string
-	config   cloud_provider.Config
+	config   packet.Config
 }
 
 func NewPacketDriver(endpoint, nodeID, configurationPath string) (*PacketDriver, error) {
 
-	var config cloud_provider.Config
+	var config packet.Config
 	if configurationPath != "" {
 		configBytes, err := ioutil.ReadFile(configurationPath)
 		if err != nil {
@@ -41,7 +41,7 @@ func (d *PacketDriver) Run() {
 	identity := NewPacketIdentityServer(d)
 	var controller *PacketControllerServer
 	if d.config.AuthToken != "" {
-		p, _ := cloud_provider.NewPacketProvider(d.config)
+		p, _ := packet.NewPacketProvider(d.config)
 		controller = NewPacketControllerServer(p)
 	}
 	node := NewPacketNodeServer(d)
