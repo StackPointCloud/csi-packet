@@ -2,6 +2,7 @@ package driver
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"testing"
 
@@ -60,7 +61,26 @@ func TestCreateVolume(t *testing.T) {
 
 }
 
-func runTestCreateVolume(t *testing.T, volumeRequest csi.CreateVolumeRequest, providerRequest packngo.VolumeCreateRequest, providerVolume packngo.Volume, success bool) {
+type matchRequest struct {
+	desc    string
+	request packngo.VolumeCreateRequest
+}
+
+func MatchRequest(desc string, request packngo.VolumeCreateRequest) gomock.Matcher {
+	return &matchRequest{desc, request}
+}
+
+func (o *matchRequest) Matches(x interface{}) bool {
+	volumeRequest := x.(*packngo.VolumeCreateRequest)
+	return volumeRequest.Size == o.request.Size &&
+		volumeRequest.PlanID == o.request.PlanID
+}
+
+func (o *matchRequest) String() string {
+	return fmt.Sprintf("[%s] has request matching <<%v>>", o.desc, o.request)
+}
+
+func runTestCreateVolume(t *testing.T, description string, volumeRequest csi.CreateVolumeRequest, providerRequest packngo.VolumeCreateRequest, providerVolume packngo.Volume, success bool) {
 
 	mockCtrl := gomock.NewController(t)
 	defer mockCtrl.Finish()
@@ -74,17 +94,21 @@ func runTestCreateVolume(t *testing.T, volumeRequest csi.CreateVolumeRequest, pr
 		packngo.Rate{},
 	}
 	provider.EXPECT().ListVolumes().Return([]packngo.Volume{}, &resp, nil)
-	provider.EXPECT().Create(gomock.Any()).Return(&providerVolume, &resp, nil)
+	// provider.EXPECT().Create(gomock.Any()).Return(&providerVolume, &resp, nil)
+	provider.EXPECT().
+		Create(MatchRequest(description, providerRequest)).
+		Return(&providerVolume, &resp, nil)
 
 	controller := NewPacketControllerServer(provider)
 
 	csiResp, err := controller.CreateVolume(context.TODO(), &volumeRequest)
 	assert.Nil(t, err)
-	assert.Equal(t, providerVolume.ID, csiResp.GetVolume().Id)
-	assert.Equal(t, int64(providerVolume.Size)*packet.GB, csiResp.GetVolume().GetCapacityBytes())
+	assert.Equal(t, providerVolume.ID, csiResp.GetVolume().Id, description)
+	assert.Equal(t, int64(providerVolume.Size)*packet.GB, csiResp.GetVolume().GetCapacityBytes(), description)
 }
 
 type VolumeTestCase struct {
+	description     string
 	volumeRequest   csi.CreateVolumeRequest
 	providerRequest packngo.VolumeCreateRequest
 	providerVolume  packngo.Volume
@@ -94,41 +118,43 @@ type VolumeTestCase struct {
 func TestCreateVolumes(t *testing.T) {
 	testCases := []VolumeTestCase{
 		VolumeTestCase{
+			description: "verify capacity specification",
 			volumeRequest: csi.CreateVolumeRequest{
 				Name: "pv-qT2QXcwbqPB3BAurt1ccs7g6SDVT0qLv",
 				CapacityRange: &csi.CapacityRange{
 					RequiredBytes: 10 * 1024 * 1024 * 1024,
-					LimitBytes:    100 * 1024 * 1024 * 1024,
+					LimitBytes:    173 * 1024 * 1024 * 1024,
 				},
 			},
 			providerRequest: packngo.VolumeCreateRequest{
 				BillingCycle: packet.BillingHourly,
 				Description:  packet.NewVolumeDescription("pv-qT2QXcwbqPB3BAurt1ccs7g6SDVT0qLv").String(),
 				Locked:       false,
-				Size:         10,
-				PlanID:       packet.VolumePlanStandard,
+				Size:         173,
+				PlanID:       packet.VolumePlanStandardID,
 			},
 			providerVolume: packngo.Volume{
-				Size:        packet.DefaultVolumeSizeGb,
+				Size:        173,
 				ID:          "5a3c678a-64a4-41ba-a03c-e7d74a96f06a",
 				Description: packet.NewVolumeDescription("pv-qT2QXcwbqPB3BAurt1ccs7g6SDVT0qLv").String(),
 			},
 			success: true,
 		},
 		VolumeTestCase{
+			description: "verify capacity maximum",
 			volumeRequest: csi.CreateVolumeRequest{
 				Name: "pv-61C4yMq09WV1ZpNIOBKHRQDKoZzyK7ZF",
 				CapacityRange: &csi.CapacityRange{
 					RequiredBytes: 1 * 1024 * 1024,
-					LimitBytes:    1000 * 1024 * 1024 * 1024,
+					LimitBytes:    15000 * 1024 * 1024 * 1024,
 				},
 			},
 			providerRequest: packngo.VolumeCreateRequest{
 				BillingCycle: packet.BillingHourly,
 				Description:  packet.NewVolumeDescription("pv-61C4yMq09WV1ZpNIOBKHRQDKoZzyK7ZF").String(),
 				Locked:       false,
-				Size:         10,
-				PlanID:       packet.VolumePlanStandard,
+				Size:         packet.MaxVolumeSizeGb,
+				PlanID:       packet.VolumePlanStandardID,
 			},
 			providerVolume: packngo.Volume{
 				Size:        packet.DefaultVolumeSizeGb,
@@ -137,10 +163,53 @@ func TestCreateVolumes(t *testing.T) {
 			},
 			success: true,
 		},
+		VolumeTestCase{
+			description: "verify capacity minimum",
+			volumeRequest: csi.CreateVolumeRequest{
+				Name: "pv-pUk6DzHQF3cGMfLCRnXSpDJ2HpzhefKI",
+				CapacityRange: &csi.CapacityRange{
+					RequiredBytes: 1 * 1024 * 1024,
+					LimitBytes:    1 * 1024 * 1024,
+				},
+			},
+			providerRequest: packngo.VolumeCreateRequest{
+				BillingCycle: packet.BillingHourly,
+				Description:  packet.NewVolumeDescription("pv-61C4yMq09WV1ZpNIOBKHRQDKoZzyK7ZF").String(),
+				Locked:       false,
+				Size:         packet.MinVolumeSizeGb,
+				PlanID:       packet.VolumePlanStandardID,
+			},
+			providerVolume: packngo.Volume{
+				Size:        packet.DefaultVolumeSizeGb,
+				ID:          "8c3b6f51-7045-44b8-ab6d-d6df7371471e",
+				Description: packet.NewVolumeDescription("pv-61C4yMq09WV1ZpNIOBKHRQDKoZzyK7ZF").String(),
+			},
+			success: true,
+		},
+		VolumeTestCase{
+			description: "verify capacity default, performance plan type",
+			volumeRequest: csi.CreateVolumeRequest{
+				Name:       "pv-pUk6DzHQF3cGMfLCRnXSpDJ2HpzhefKI",
+				Parameters: map[string]string{"plan": "performance"},
+			},
+			providerRequest: packngo.VolumeCreateRequest{
+				BillingCycle: packet.BillingHourly,
+				Description:  packet.NewVolumeDescription("pv-61C4yMq09WV1ZpNIOBKHRQDKoZzyK7ZF").String(),
+				Locked:       false,
+				Size:         packet.DefaultVolumeSizeGb,
+				PlanID:       packet.VolumePlanPerformanceID,
+			},
+			providerVolume: packngo.Volume{
+				Size:        packet.DefaultVolumeSizeGb,
+				ID:          "a94ecff0-b221-4d2d-8dc4-432bed506941",
+				Description: packet.NewVolumeDescription("pv-61C4yMq09WV1ZpNIOBKHRQDKoZzyK7ZF").String(),
+			},
+			success: true,
+		},
 	}
 
 	for _, testCase := range testCases {
-		runTestCreateVolume(t, testCase.volumeRequest, testCase.providerRequest, testCase.providerVolume, testCase.success)
+		runTestCreateVolume(t, testCase.description, testCase.volumeRequest, testCase.providerRequest, testCase.providerVolume, testCase.success)
 	}
 }
 

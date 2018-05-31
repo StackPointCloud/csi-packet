@@ -1,11 +1,21 @@
 apiVersion: storage.k8s.io/v1beta1
 kind: StorageClass
 metadata:
-  name: csi-packet-pd
+  name: csi-packet-standard
 provisioner: csi-packet
 parameters:
-  type: something-something
+  plan: standard
 volumeBindingMode: Immediate
+
+apiVersion: storage.k8s.io/v1beta1
+kind: StorageClass
+metadata:
+  name: csi-packet-performance
+provisioner: csi-packet
+parameters:
+  plan: performance
+volumeBindingMode: Immediate
+
 
 ---
 

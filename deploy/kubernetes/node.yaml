@@ -36,7 +36,7 @@ spec:
           securityContext:
             privileged: true
           imagePullPolicy: Always
-          image: gcr.io/stackpoint-public/csi-packet-driver:0.0.1
+          image: gcr.io/stackpoint-public/csi-packet-driver:0.0.2
           args:
             - "--v=5"
             - "--endpoint=$(CSI_ENDPOINT)"
@@ -64,6 +64,8 @@ spec:
               name: run-udev
             - mountPath: /var/lib/iscsi
               name: var-lib-iscsi
+            - name: lib-modules
+              mountPath: /lib/modules
             - mountPath: /usr/share/ca-certificates/
               name: ca-certs-alternative
               readOnly: true
@@ -99,6 +101,10 @@ spec:
         - name: run-udev
           hostPath:
             path: /run/udev/
+            type: Directory
+        - name: lib-modules
+          hostPath:
+            path: /lib/modules
             type: Directory
         - name: ca-certs-alternative
           hostPath:

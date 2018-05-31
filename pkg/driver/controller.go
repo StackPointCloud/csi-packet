@@ -53,38 +53,55 @@ func (controller *PacketControllerServer) CreateVolume(ctx context.Context, in *
 
 	}
 
+	var planID string
+
+	volumePlanRequest := in.GetParameters()["plan"]
+	switch volumePlanRequest {
+	case packet.VolumePlanPerformance:
+		planID = packet.VolumePlanPerformanceID
+	case packet.VolumePlanStandard:
+		planID = packet.VolumePlanStandardID
+	default:
+		planID = packet.VolumePlanStandardID
+
+	}
+
 	// size request:
 	//   limit if specified
 	//   required otherwise
 	//   within restrictions of max, min
 	//   default otherwise
-	sizeRequestGB := packet.DefaultVolumeSizeGb
+	var sizeRequestGB int
 	capacityRange := in.CapacityRange
-	if capacityRange != nil {
+	if capacityRange == nil {
+		sizeRequestGB = packet.DefaultVolumeSizeGb
+	} else {
 		maxBytes := capacityRange.GetLimitBytes()
 		if maxBytes != 0 {
 			sizeRequestGB = int(maxBytes / packet.GB)
-			if sizeRequestGB > packet.MaxVolumeSizeGb {
-				sizeRequestGB = packet.MaxVolumeSizeGb
-			}
+
 		} else {
 			minBytes := capacityRange.GetRequiredBytes()
 			if minBytes != 0 {
 				sizeRequestGB = int(minBytes / packet.GB)
-				if sizeRequestGB < packet.MinVolumeSizeGb {
-					sizeRequestGB = packet.MinVolumeSizeGb
-				}
+
 			}
 		}
+	}
+	if sizeRequestGB > packet.MaxVolumeSizeGb {
+		sizeRequestGB = packet.MaxVolumeSizeGb
+	}
+	if sizeRequestGB < packet.MinVolumeSizeGb {
+		sizeRequestGB = packet.MinVolumeSizeGb
 	}
 
 	description := packet.NewVolumeDescription(in.Name)
 
 	volumeCreateRequest := packngo.VolumeCreateRequest{
-		Size:         sizeRequestGB,             // int               `json:"size"`
-		BillingCycle: packet.BillingHourly,      // string            `json:"billing_cycle"`
-		PlanID:       packet.VolumePlanStandard, // string            `json:"plan_id"`
-		Description:  description.String(),      // string            `json:"description,omitempty"`
+		Size:         sizeRequestGB,        // int               `json:"size"`
+		BillingCycle: packet.BillingHourly, // string            `json:"billing_cycle"`
+		PlanID:       planID,               // string            `json:"plan_id"`
+		Description:  description.String(), // string            `json:"description,omitempty"`
 		// SnapshotPolicies // []*SnapshotPolicy `json:"snapshot_policies,omitempty"`
 	}
 	volume, httpResponse, err := controller.Provider.Create(&volumeCreateRequest)
@@ -140,7 +157,7 @@ func (controller *PacketControllerServer) ControllerPublishVolume(ctx context.Co
 		return nil, err
 	}
 	if httpResponse.StatusCode != http.StatusOK {
-		return nil, errors.Errorf("bad status from list volumes, %s", httpResponse.Status)
+		return nil, errors.Errorf("bad status from get nodes, %s", httpResponse.Status)
 	}
 	// for packet this should be an ip address but try hostnam as well first anyway
 	var nodeID string
@@ -163,8 +180,8 @@ func (controller *PacketControllerServer) ControllerPublishVolume(ctx context.Co
 	if err != nil {
 		return nil, errors.Wrap(err, fmt.Sprintf("attempting to attach %s to %s", volumeID, nodeID))
 	}
-	if httpResponse.StatusCode != http.StatusOK {
-		return nil, errors.Errorf("bad status from list volumes, %s", httpResponse.Status)
+	if httpResponse.StatusCode != http.StatusOK && httpResponse.StatusCode != http.StatusCreated {
+		return nil, errors.Errorf("bad status from attach volumes, %s", httpResponse.Status)
 	}
 
 	metadata := make(map[string]string)
@@ -211,7 +228,7 @@ func (controller *PacketControllerServer) ControllerUnpublishVolume(ctx context.
 		return nil, err
 	}
 	if httpResponse.StatusCode != http.StatusOK && httpResponse.StatusCode != http.StatusNotFound {
-		return nil, errors.Errorf("bad status from list volumes, %s", httpResponse.Status)
+		return nil, errors.Errorf("bad status from detach volume, %s", httpResponse.Status)
 	}
 
 	return &csi.ControllerUnpublishVolumeResponse{}, nil
