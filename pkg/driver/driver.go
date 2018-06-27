@@ -46,7 +46,10 @@ func (d *PacketDriver) Run() {
 	identity := NewPacketIdentityServer(d)
 	var controller *PacketControllerServer
 	if d.config.AuthToken != "" {
-		p, _ := packet.NewPacketProvider(d.config)
+		p, err := packet.NewPacketProvider(d.config)
+		if err != nil {
+			d.Logger.Fatalf("Unable to create controller %+v", err)
+		}
 		controller = NewPacketControllerServer(p)
 	}
 	node := NewPacketNodeServer(d)

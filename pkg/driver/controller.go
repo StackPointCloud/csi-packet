@@ -110,8 +110,11 @@ func (controller *PacketControllerServer) CreateVolume(ctx context.Context, in *
 		if err == nil && description.Name == in.Name {
 			logger.Infof("Volume already exists with id %s", volume.ID)
 
-			if volume.Size != sizeRequestGB || volume.Plan.ID != planID {
-				return nil, status.Error(codes.AlreadyExists, fmt.Sprintf("mismatch with existing volume %s, size %d, plan %s", in.Name, volume.Size, volume.Plan.Name))
+			if volume.Size != sizeRequestGB {
+				return nil, status.Error(codes.AlreadyExists, fmt.Sprintf("mismatch with existing volume %s, size %d, requested %d", in.Name, volume.Size, sizeRequestGB))
+			}
+			if volume.Plan.ID != planID {
+				return nil, status.Error(codes.AlreadyExists, fmt.Sprintf("mismatch with existing volume %s, plan %+v, requested %s", in.Name, volume.Plan, planID))
 			}
 
 			out := csi.CreateVolumeResponse{
@@ -179,7 +182,7 @@ func (controller *PacketControllerServer) DeleteVolume(ctx context.Context, in *
 	case http.StatusOK, http.StatusNoContent, http.StatusNotFound:
 		return &csi.DeleteVolumeResponse{}, nil
 	case http.StatusUnprocessableEntity:
-		return nil, status.Error(codes.FailedPrecondition, fmt.Sprintf("code %s indicates retry condition", httpResponse.StatusCode))
+		return nil, status.Error(codes.FailedPrecondition, fmt.Sprintf("code %d indicates retry condition", httpResponse.StatusCode))
 	}
 	return nil, status.Error(codes.Unknown, fmt.Sprintf("bad status from delete volumes, %s", httpResponse.Status))
 }
@@ -187,16 +190,16 @@ func (controller *PacketControllerServer) DeleteVolume(ctx context.Context, in *
 // ControllerPublishVolume attaches a volume to a node
 func (controller *PacketControllerServer) ControllerPublishVolume(ctx context.Context, in *csi.ControllerPublishVolumeRequest) (*csi.ControllerPublishVolumeResponse, error) {
 	if controller == nil || controller.Provider == nil {
-		return nil, status.Error(codes.Internal, fmt.Sprintf("controller not configured"))
+		return nil, status.Error(codes.Internal, "controller not configured")
 	}
 	if in.NodeId == "" {
-		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("NodeId unspecified for ControllerPublishVolume"))
+		return nil, status.Error(codes.InvalidArgument, "NodeId unspecified for ControllerPublishVolume")
 	}
 	if in.VolumeId == "" {
-		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("VolumeId unspecified for ControllerPublishVolume"))
+		return nil, status.Error(codes.InvalidArgument, "VolumeId unspecified for ControllerPublishVolume")
 	}
 	if in.VolumeCapability == nil {
-		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("VolumeCapability unspecified for ControllerPublishVolume"))
+		return nil, status.Error(codes.InvalidArgument, "VolumeCapability unspecified for ControllerPublishVolume")
 	}
 
 	csiNodeID := in.NodeId
